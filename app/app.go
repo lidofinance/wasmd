@@ -22,9 +22,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authrest "github.com/cosmos/cosmos-sdk/x/auth/client/rest"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	"github.com/cosmos/cosmos-sdk/x/auth/middleware"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -644,25 +644,26 @@ func NewWasmApp(
 	app.MountTransientStores(tkeys)
 	app.MountMemoryStores(memKeys)
 
-	anteHandler, err := NewAnteHandler(
-		HandlerOptions{
-			HandlerOptions: ante.HandlerOptions{
-				AccountKeeper:   app.accountKeeper,
-				BankKeeper:      app.bankKeeper,
-				FeegrantKeeper:  app.FeeGrantKeeper,
-				SignModeHandler: encodingConfig.TxConfig.SignModeHandler(),
-				SigGasConsumer:  ante.DefaultSigVerificationGasConsumer,
-			},
-			IBCChannelkeeper:  app.ibcKeeper.ChannelKeeper,
-			WasmConfig:        &wasmConfig,
-			TXCounterStoreKey: keys[wasm.StoreKey],
-		},
-	)
-	if err != nil {
-		panic(fmt.Errorf("failed to create AnteHandler: %s", err))
-	}
+	txHandler, err := middleware.NewDefaultTxHandler(
+		middleware.TxHandlerOptions{
+			TxDecoder: encodingConfig.TxConfig.TxDecoder(),
 
-	app.SetAnteHandler(anteHandler)
+			// todo(lido) they used to do something like cast.ToStringSlice(appOpts.Get(server.FlagIndexEvents)),
+			// but it's not a slice anymore, it's a map. not sure what to do here.
+			// IndexEvents: ???,
+
+			LegacyRouter:     middleware.NewLegacyRouter(),
+			MsgServiceRouter: middleware.NewMsgServiceRouter(encodingConfig.InterfaceRegistry),
+			AccountKeeper:    app.accountKeeper,
+			BankKeeper:       app.bankKeeper,
+			FeegrantKeeper:   app.FeeGrantKeeper,
+			SignModeHandler:  encodingConfig.TxConfig.SignModeHandler(),
+			SigGasConsumer:   middleware.DefaultSigVerificationGasConsumer,
+		})
+	if err != nil {
+		panic(fmt.Errorf("failed to create TxHandler: %s", err))
+	}
+	app.SetTxHandler(txHandler)
 	app.SetInitChainer(app.InitChainer)
 	app.SetBeginBlocker(app.BeginBlocker)
 	app.SetEndBlocker(app.EndBlocker)
