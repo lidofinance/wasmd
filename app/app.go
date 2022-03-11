@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	authmiddleware "github.com/cosmos/cosmos-sdk/x/auth/middleware"
 	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -58,6 +59,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/gov"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	oldgovtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
+	newgovtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta2"
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
@@ -224,9 +227,9 @@ var (
 // WasmApp extended ABCI application
 type WasmApp struct {
 	*baseapp.BaseApp
-	legacyAmino       *codec.LegacyAmino //nolint:staticcheck
-	appCodec          codec.Codec
-	interfaceRegistry types.InterfaceRegistry
+	legacyAmino  *codec.LegacyAmino //nolint:staticcheck
+	appCodec     codec.Codec
+	legacyRouter sdk.Router
 
 	invCheckPeriod uint
 
@@ -234,6 +237,9 @@ type WasmApp struct {
 	keys    map[string]*sdkstore.KVStoreKey
 	tkeys   map[string]*sdkstore.TransientStoreKey
 	memKeys map[string]*sdkstore.MemoryStoreKey
+
+	interfaceRegistry types.InterfaceRegistry
+	MsgSvcRouter      *authmiddleware.MsgServiceRouter
 
 	// keepers
 	accountKeeper    authkeeper.AccountKeeper
@@ -306,11 +312,13 @@ func NewWasmApp(
 		BaseApp:           bApp,
 		legacyAmino:       legacyAmino,
 		appCodec:          appCodec,
-		interfaceRegistry: interfaceRegistry,
 		invCheckPeriod:    invCheckPeriod,
 		keys:              keys,
 		tkeys:             tkeys,
 		memKeys:           memKeys,
+		interfaceRegistry: interfaceRegistry,
+		legacyRouter:      authmiddleware.NewLegacyRouter(),
+		MsgSvcRouter:      authmiddleware.NewMsgServiceRouter(interfaceRegistry),
 	}
 
 	app.paramsKeeper = initParamsKeeper(
@@ -353,7 +361,7 @@ func NewWasmApp(
 	app.AuthzKeeper = authzkeeper.NewKeeper(
 		keys[authzkeeper.StoreKey],
 		appCodec,
-		app.BaseApp.MsgServiceRouter(),
+		app.MsgSvcRouter,
 		app.accountKeeper,
 	)
 	app.FeeGrantKeeper = feegrantkeeper.NewKeeper(
@@ -385,7 +393,6 @@ func NewWasmApp(
 		app.bankKeeper,
 		&stakingKeeper,
 		authtypes.FeeCollectorName,
-		app.ModuleAccountAddrs(),
 	)
 	app.slashingKeeper = slashingkeeper.NewKeeper(
 		appCodec,
@@ -405,6 +412,7 @@ func NewWasmApp(
 		appCodec,
 		homePath,
 		app.BaseApp,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 
 	// register the staking hooks
@@ -423,9 +431,9 @@ func NewWasmApp(
 	)
 
 	// register the proposal types
-	govRouter := govtypes.NewRouter()
+	govRouter := oldgovtypes.NewRouter()
 	govRouter.
-		AddRoute(govtypes.RouterKey, govtypes.ProposalHandler).
+		AddRoute(govtypes.RouterKey, oldgovtypes.ProposalHandler).
 		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(app.paramsKeeper)).
 		AddRoute(distrtypes.RouterKey, distr.NewCommunityPoolSpendProposalHandler(app.distrKeeper)).
 		AddRoute(upgradetypes.RouterKey, upgrade.NewSoftwareUpgradeProposalHandler(app.upgradeKeeper)).
@@ -437,16 +445,18 @@ func NewWasmApp(
 		keys[ibctransfertypes.StoreKey],
 		app.getSubspace(ibctransfertypes.ModuleName),
 		app.ibcKeeper.ChannelKeeper,
+		app.ibcKeeper.ChannelKeeper,
 		&app.ibcKeeper.PortKeeper,
 		app.accountKeeper,
 		app.bankKeeper,
 		scopedTransferKeeper,
 	)
 	transferModule := transfer.NewAppModule(app.transferKeeper)
+	transferIBCModule := transfer.NewIBCModule(app.transferKeeper)
 
 	// create static IBC router, add transfer route, then set and seal it
 	ibcRouter := porttypes.NewRouter()
-	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferModule)
+	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferIBCModule)
 
 	// create evidence keeper with router
 	evidenceKeeper := evidencekeeper.NewKeeper(
@@ -478,7 +488,7 @@ func NewWasmApp(
 		&app.ibcKeeper.PortKeeper,
 		scopedWasmKeeper,
 		app.transferKeeper,
-		app.MsgServiceRouter(),
+		app.MsgSvcRouter,
 		app.GRPCQueryRouter(),
 		wasmDir,
 		wasmConfig,
@@ -501,6 +511,8 @@ func NewWasmApp(
 		app.bankKeeper,
 		&stakingKeeper,
 		govRouter,
+		app.MsgSvcRouter,
+		govtypes.DefaultConfig(),
 	)
 	/****  Module Options ****/
 
@@ -522,7 +534,7 @@ func NewWasmApp(
 		bank.NewAppModule(appCodec, app.bankKeeper, app.accountKeeper),
 		capability.NewAppModule(appCodec, *app.capabilityKeeper),
 		gov.NewAppModule(appCodec, app.govKeeper, app.accountKeeper, app.bankKeeper),
-		mint.NewAppModule(appCodec, app.mintKeeper, app.accountKeeper),
+		mint.NewAppModule(appCodec, app.mintKeeper, app.accountKeeper, nil),
 		slashing.NewAppModule(appCodec, app.slashingKeeper, app.accountKeeper, app.bankKeeper, app.stakingKeeper),
 		distr.NewAppModule(appCodec, app.distrKeeper, app.accountKeeper, app.bankKeeper, app.stakingKeeper),
 		staking.NewAppModule(appCodec, app.stakingKeeper, app.accountKeeper, app.bankKeeper),
@@ -622,9 +634,9 @@ func NewWasmApp(
 	// app.mm.SetOrderMigrations(custom order)
 
 	app.mm.RegisterInvariants(&app.crisisKeeper)
-	app.mm.RegisterRoutes(app.Router(), app.QueryRouter(), encodingConfig.Amino)
+	app.mm.RegisterRoutes(app.legacyRouter, app.QueryRouter(), encodingConfig.Amino)
 
-	app.configurator = module.NewConfigurator(app.appCodec, app.MsgServiceRouter(), app.GRPCQueryRouter())
+	app.configurator = module.NewConfigurator(app.appCodec, app.MsgSvcRouter, app.GRPCQueryRouter())
 	app.mm.RegisterServices(app.configurator)
 
 	// create the simulation manager and define the order of the modules for deterministic simulations
@@ -638,7 +650,7 @@ func NewWasmApp(
 		feegrantmodule.NewAppModule(appCodec, app.accountKeeper, app.bankKeeper, app.FeeGrantKeeper, app.interfaceRegistry),
 		authzmodule.NewAppModule(appCodec, app.AuthzKeeper, app.accountKeeper, app.bankKeeper, app.interfaceRegistry),
 		gov.NewAppModule(appCodec, app.govKeeper, app.accountKeeper, app.bankKeeper),
-		mint.NewAppModule(appCodec, app.mintKeeper, app.accountKeeper),
+		mint.NewAppModule(appCodec, app.mintKeeper, app.accountKeeper, nil),
 		staking.NewAppModule(appCodec, app.stakingKeeper, app.accountKeeper, app.bankKeeper),
 		distr.NewAppModule(appCodec, app.distrKeeper, app.accountKeeper, app.bankKeeper, app.stakingKeeper),
 		slashing.NewAppModule(appCodec, app.slashingKeeper, app.accountKeeper, app.bankKeeper, app.stakingKeeper),
@@ -818,7 +830,7 @@ func GetMaccPerms() map[string][]string {
 }
 
 // initParamsKeeper init params keeper and its subspaces
-func initParamsKeeper(appCodec codec.BinaryCodec, legacyAmino *codec.LegacyAmino, key, tkey sdk.StoreKey) paramskeeper.Keeper {
+func initParamsKeeper(appCodec codec.BinaryCodec, legacyAmino *codec.LegacyAmino, key, tkey sdkstore.StoreKey) paramskeeper.Keeper {
 	paramsKeeper := paramskeeper.NewKeeper(appCodec, legacyAmino, key, tkey)
 
 	paramsKeeper.Subspace(authtypes.ModuleName)
@@ -827,7 +839,7 @@ func initParamsKeeper(appCodec codec.BinaryCodec, legacyAmino *codec.LegacyAmino
 	paramsKeeper.Subspace(minttypes.ModuleName)
 	paramsKeeper.Subspace(distrtypes.ModuleName)
 	paramsKeeper.Subspace(slashingtypes.ModuleName)
-	paramsKeeper.Subspace(govtypes.ModuleName).WithKeyTable(govtypes.ParamKeyTable())
+	paramsKeeper.Subspace(govtypes.ModuleName).WithKeyTable(newgovtypes.ParamKeyTable())
 	paramsKeeper.Subspace(crisistypes.ModuleName)
 	paramsKeeper.Subspace(ibctransfertypes.ModuleName)
 	paramsKeeper.Subspace(ibchost.ModuleName)

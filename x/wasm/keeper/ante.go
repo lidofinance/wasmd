@@ -3,6 +3,7 @@ package keeper
 import (
 	"encoding/binary"
 
+	sdkstore "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
@@ -10,11 +11,11 @@ import (
 
 // CountTXDecorator ante handler to count the tx position in a block.
 type CountTXDecorator struct {
-	storeKey sdk.StoreKey
+	storeKey sdkstore.StoreKey
 }
 
 // NewCountTXDecorator constructor
-func NewCountTXDecorator(storeKey sdk.StoreKey) *CountTXDecorator {
+func NewCountTXDecorator(storeKey sdkstore.StoreKey) *CountTXDecorator {
 	return &CountTXDecorator{storeKey: storeKey}
 }
 

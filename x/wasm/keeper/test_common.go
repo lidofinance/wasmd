@@ -12,6 +12,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/std"
 	"github.com/cosmos/cosmos-sdk/store"
+	sdkstore "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -35,8 +36,11 @@ import (
 	evidencetypes "github.com/cosmos/cosmos-sdk/x/evidence/types"
 	"github.com/cosmos/cosmos-sdk/x/feegrant"
 	"github.com/cosmos/cosmos-sdk/x/gov"
+	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	oldgovtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
+	newgovtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta2"
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/params"
@@ -70,6 +74,8 @@ import (
 
 	"github.com/CosmWasm/wasmd/x/wasm/keeper/wasmtesting"
 	"github.com/CosmWasm/wasmd/x/wasm/types"
+
+	"github.com/cosmos/cosmos-sdk/x/auth/middleware"
 )
 
 var ModuleBasics = module.NewBasicManager(
@@ -80,7 +86,7 @@ var ModuleBasics = module.NewBasicManager(
 	mint.AppModuleBasic{},
 	distribution.AppModuleBasic{},
 	gov.NewAppModuleBasic(
-		paramsclient.ProposalHandler, distrclient.ProposalHandler, upgradeclient.ProposalHandler,
+		[]govclient.ProposalHandler{paramsclient.ProposalHandler, distrclient.ProposalHandler, upgradeclient.LegacyProposalHandler},
 	),
 	params.AppModuleBasic{},
 	crisis.AppModuleBasic{},
@@ -175,7 +181,7 @@ type TestKeepers struct {
 	ContractKeeper types.ContractOpsKeeper
 	WasmKeeper     *Keeper
 	IBCKeeper      *ibckeeper.Keeper
-	Router         *baseapp.Router
+	Router         *middleware.LegacyRouter
 	EncodingConfig wasmappparams.EncodingConfig
 	Faucet         *TestFaucet
 }
@@ -212,16 +218,16 @@ func createTestInput(
 	)
 	ms := store.NewCommitMultiStore(db)
 	for _, v := range keys {
-		ms.MountStoreWithDB(v, sdk.StoreTypeIAVL, db)
+		ms.MountStoreWithDB(v, sdkstore.StoreTypeIAVL, db)
 	}
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
 	for _, v := range tkeys {
-		ms.MountStoreWithDB(v, sdk.StoreTypeTransient, db)
+		ms.MountStoreWithDB(v, sdkstore.StoreTypeTransient, db)
 	}
 
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
 	for _, v := range memKeys {
-		ms.MountStoreWithDB(v, sdk.StoreTypeMemory, db)
+		ms.MountStoreWithDB(v, sdkstore.StoreTypeMemory, db)
 	}
 
 	require.NoError(t, ms.LoadLatestVersion())
@@ -276,6 +282,7 @@ func createTestInput(
 		subspace(authtypes.ModuleName),
 		authtypes.ProtoBaseAccount, // prototype
 		maccPerms,
+		sdk.Bech32MainPrefix,
 	)
 	blockedAddrs := make(map[string]bool)
 	for acc := range maccPerms {
@@ -308,7 +315,6 @@ func createTestInput(
 		bankKeeper,
 		stakingKeeper,
 		authtypes.FeeCollectorName,
-		nil,
 	)
 	distKeeper.SetParams(ctx, distributiontypes.DefaultParams())
 	stakingKeeper.SetHooks(distKeeper.Hooks())
@@ -322,6 +328,7 @@ func createTestInput(
 		appCodec,
 		tempDir,
 		nil,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 
 	faucet := NewTestFaucet(t, ctx, bankKeeper, minttypes.ModuleName, sdk.NewCoin("stake", sdk.NewInt(100_000_000_000)))
@@ -349,18 +356,17 @@ func createTestInput(
 		scopedIBCKeeper,
 	)
 
-	router := baseapp.NewRouter()
-	bh := bank.NewHandler(bankKeeper)
-	router.AddRoute(sdk.NewRoute(banktypes.RouterKey, bh))
-	sh := staking.NewHandler(stakingKeeper)
-	router.AddRoute(sdk.NewRoute(stakingtypes.RouterKey, sh))
-	dh := distribution.NewHandler(distKeeper)
-	router.AddRoute(sdk.NewRoute(distributiontypes.RouterKey, dh))
+	router := middleware.NewLegacyRouter()
+	//bh := bank.NewHandler(bankKeeper)
+	//router.AddRoute(sdk.NewRoute(banktypes.RouterKey, bh))
+	//sh := staking.NewHandler(stakingKeeper)
+	//router.AddRoute(sdk.NewRoute(stakingtypes.RouterKey, sh))
+	//dh := distribution.NewHandler(distKeeper)
+	//router.AddRoute(sdk.NewRoute(distributiontypes.RouterKey, dh))
 
 	querier := baseapp.NewGRPCQueryRouter()
 	querier.SetInterfaceRegistry(encodingConfig.InterfaceRegistry)
-	msgRouter := baseapp.NewMsgServiceRouter()
-	msgRouter.SetInterfaceRegistry(encodingConfig.InterfaceRegistry)
+	msgRouter := middleware.NewMsgServiceRouter(encodingConfig.InterfaceRegistry)
 
 	cfg := sdk.GetConfig()
 	cfg.SetAddressVerifier(types.VerifyAddressLen())
@@ -398,8 +404,8 @@ func createTestInput(
 	types.RegisterMsgServer(msgRouter, NewMsgServerImpl(NewDefaultPermissionKeeper(keeper)))
 	types.RegisterQueryServer(querier, NewGrpcQuerier(appCodec, keys[types.ModuleName], keeper, keeper.queryGasLimit))
 
-	govRouter := govtypes.NewRouter().
-		AddRoute(govtypes.RouterKey, govtypes.ProposalHandler).
+	govRouter := oldgovtypes.NewRouter().
+		AddRoute(govtypes.RouterKey, oldgovtypes.ProposalHandler).
 		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(paramsKeeper)).
 		AddRoute(distributiontypes.RouterKey, distribution.NewCommunityPoolSpendProposalHandler(distKeeper)).
 		AddRoute(types.RouterKey, NewWasmProposalHandler(&keeper, types.EnableAllProposals))
@@ -407,17 +413,19 @@ func createTestInput(
 	govKeeper := govkeeper.NewKeeper(
 		appCodec,
 		keys[govtypes.StoreKey],
-		subspace(govtypes.ModuleName).WithKeyTable(govtypes.ParamKeyTable()),
+		subspace(govtypes.ModuleName).WithKeyTable(newgovtypes.ParamKeyTable()),
 		accountKeeper,
 		bankKeeper,
 		stakingKeeper,
 		govRouter,
+		middleware.NewMsgServiceRouter(encodingConfig.InterfaceRegistry),
+		govtypes.DefaultConfig(),
 	)
 
-	govKeeper.SetProposalID(ctx, govtypes.DefaultStartingProposalID)
-	govKeeper.SetDepositParams(ctx, govtypes.DefaultDepositParams())
-	govKeeper.SetVotingParams(ctx, govtypes.DefaultVotingParams())
-	govKeeper.SetTallyParams(ctx, govtypes.DefaultTallyParams())
+	govKeeper.SetProposalID(ctx, oldgovtypes.DefaultStartingProposalID)
+	govKeeper.SetDepositParams(ctx, newgovtypes.DefaultDepositParams())
+	govKeeper.SetVotingParams(ctx, newgovtypes.DefaultVotingParams())
+	govKeeper.SetTallyParams(ctx, newgovtypes.DefaultTallyParams())
 
 	keepers := TestKeepers{
 		AccountKeeper:  accountKeeper,

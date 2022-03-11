@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 
 	"github.com/cosmos/cosmos-sdk/codec"
+	sdkstore "github.com/cosmos/cosmos-sdk/store/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -21,13 +22,13 @@ var _ types.QueryServer = &grpcQuerier{}
 
 type grpcQuerier struct {
 	cdc           codec.Codec
-	storeKey      sdk.StoreKey
+	storeKey      sdkstore.StoreKey
 	keeper        types.ViewKeeper
 	queryGasLimit sdk.Gas
 }
 
 // NewGrpcQuerier constructor
-func NewGrpcQuerier(cdc codec.Codec, storeKey sdk.StoreKey, keeper types.ViewKeeper, queryGasLimit sdk.Gas) *grpcQuerier { //nolint:revive
+func NewGrpcQuerier(cdc codec.Codec, storeKey sdkstore.StoreKey, keeper types.ViewKeeper, queryGasLimit sdk.Gas) *grpcQuerier { //nolint:revive
 	return &grpcQuerier{cdc: cdc, storeKey: storeKey, keeper: keeper, queryGasLimit: queryGasLimit}
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	wasmvmtypes "github.com/CosmWasm/wasmvm/types"
-	"github.com/cosmos/cosmos-sdk/baseapp"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -13,6 +12,8 @@ import (
 	host "github.com/cosmos/ibc-go/v3/modules/core/24-host"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
+
+	"github.com/cosmos/cosmos-sdk/x/auth/middleware"
 )
 
 // msgEncoder is an extension point to customize encodings
@@ -23,7 +24,7 @@ type msgEncoder interface {
 
 // MessageRouter ADR 031 request type routing
 type MessageRouter interface {
-	Handler(msg sdk.Msg) baseapp.MsgServiceHandler
+	Handler(msg sdk.Msg) middleware.MsgServiceHandler
 }
 
 // SDKMessageHandler can handles messages that can be encoded into sdk.Message types and routed.

@@ -14,10 +14,11 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/store"
 	"github.com/cosmos/cosmos-sdk/store/prefix"
+	sdkstore "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	distributionkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
-	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	oldgovtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
@@ -73,9 +74,9 @@ func TestGenesisExportImport(t *testing.T) {
 		}
 		if contractExtension {
 			anyTime := time.Now().UTC()
-			var nestedType govtypes.TextProposal
+			var nestedType oldgovtypes.TextProposal
 			f.NilChance(0).Fuzz(&nestedType)
-			myExtension, err := govtypes.NewProposal(&nestedType, 1, anyTime, anyTime)
+			myExtension, err := oldgovtypes.NewProposal(&nestedType, 1, anyTime, anyTime)
 			require.NoError(t, err)
 			contract.SetExtension(&myExtension)
 		}
@@ -135,9 +136,9 @@ func TestGenesisExportImport(t *testing.T) {
 		dstIT := dstCtx.KVStore(dstStoreKeys[j]).Iterator(nil, nil)
 
 		for i := 0; srcIT.Valid(); i++ {
-			require.True(t, dstIT.Valid(), "[%s] destination DB has less elements than source. Missing: %x", srcStoreKeys[j].Name(), srcIT.Key())
+			require.True(t, dstIT.Valid(), "[%s] destination DB has less elements than source. Missing: %x", srcStoreKeys[j], srcIT.Key())
 			require.Equal(t, srcIT.Key(), dstIT.Key(), i)
-			require.Equal(t, srcIT.Value(), dstIT.Value(), "[%s] element (%d): %X", srcStoreKeys[j].Name(), i, srcIT.Key())
+			require.Equal(t, srcIT.Value(), dstIT.Value(), "[%s] element (%d): %X", srcStoreKeys[j], i, srcIT.Key())
 			dstIT.Next()
 			srcIT.Next()
 		}
@@ -626,7 +627,7 @@ func TestSupportedGenMsgTypes(t *testing.T) {
 	assert.Equal(t, sdk.NewCoin(denom, sdk.NewInt(10)), gotBalance)
 }
 
-func setupKeeper(t *testing.T) (*Keeper, sdk.Context, []sdk.StoreKey) {
+func setupKeeper(t *testing.T) (*Keeper, sdk.Context, []sdkstore.StoreKey) {
 	t.Helper()
 	tempDir, err := ioutil.TempDir("", "wasm")
 	require.NoError(t, err)
@@ -639,9 +640,9 @@ func setupKeeper(t *testing.T) (*Keeper, sdk.Context, []sdk.StoreKey) {
 
 	db := dbm.NewMemDB()
 	ms := store.NewCommitMultiStore(db)
-	ms.MountStoreWithDB(keyWasm, sdk.StoreTypeIAVL, db)
-	ms.MountStoreWithDB(keyParams, sdk.StoreTypeIAVL, db)
-	ms.MountStoreWithDB(tkeyParams, sdk.StoreTypeTransient, db)
+	ms.MountStoreWithDB(keyWasm, sdkstore.StoreTypeIAVL, db)
+	ms.MountStoreWithDB(keyParams, sdkstore.StoreTypeIAVL, db)
+	ms.MountStoreWithDB(tkeyParams, sdkstore.StoreTypeTransient, db)
 	require.NoError(t, ms.LoadLatestVersion())
 
 	ctx := sdk.NewContext(ms, tmproto.Header{
@@ -653,16 +654,16 @@ func setupKeeper(t *testing.T) (*Keeper, sdk.Context, []sdk.StoreKey) {
 	// register an example extension. must be protobuf
 	encodingConfig.InterfaceRegistry.RegisterImplementations(
 		(*types.ContractInfoExtension)(nil),
-		&govtypes.Proposal{},
+		&oldgovtypes.Proposal{},
 	)
 	// also registering gov interfaces for nested Any type
-	govtypes.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	oldgovtypes.RegisterInterfaces(encodingConfig.InterfaceRegistry)
 
 	wasmConfig := wasmTypes.DefaultWasmConfig()
 	pk := paramskeeper.NewKeeper(encodingConfig.Marshaler, encodingConfig.Amino, keyParams, tkeyParams)
 
 	srcKeeper := NewKeeper(encodingConfig.Marshaler, keyWasm, pk.Subspace(wasmTypes.ModuleName), authkeeper.AccountKeeper{}, nil, stakingkeeper.Keeper{}, distributionkeeper.Keeper{}, nil, nil, nil, nil, nil, nil, tempDir, wasmConfig, SupportedFeatures)
-	return &srcKeeper, ctx, []sdk.StoreKey{keyWasm, keyParams}
+	return &srcKeeper, ctx, []sdkstore.StoreKey{keyWasm, keyParams}
 }
 
 type StakingKeeperMock struct {

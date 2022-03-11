@@ -6,7 +6,6 @@ import (
 
 	wasmvm "github.com/CosmWasm/wasmvm"
 	wasmvmtypes "github.com/CosmWasm/wasmvm/types"
-	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -19,6 +18,8 @@ import (
 
 	"github.com/CosmWasm/wasmd/x/wasm/keeper/wasmtesting"
 	"github.com/CosmWasm/wasmd/x/wasm/types"
+
+	"github.com/cosmos/cosmos-sdk/x/auth/middleware"
 )
 
 func TestMessageHandlerChainDispatch(t *testing.T) {
@@ -100,13 +101,13 @@ func TestSDKMessageHandlerDispatch(t *testing.T) {
 	}
 
 	var gotMsg []sdk.Msg
-	capturingMessageRouter := wasmtesting.MessageRouterFunc(func(msg sdk.Msg) baseapp.MsgServiceHandler {
+	capturingMessageRouter := wasmtesting.MessageRouterFunc(func(msg sdk.Msg) middleware.MsgServiceHandler {
 		return func(ctx sdk.Context, req sdk.Msg) (*sdk.Result, error) {
 			gotMsg = append(gotMsg, msg)
 			return &myRouterResult, nil
 		}
 	})
-	noRouteMessageRouter := wasmtesting.MessageRouterFunc(func(msg sdk.Msg) baseapp.MsgServiceHandler {
+	noRouteMessageRouter := wasmtesting.MessageRouterFunc(func(msg sdk.Msg) middleware.MsgServiceHandler {
 		return nil
 	})
 	myContractAddr := RandomAccountAddress(t)
