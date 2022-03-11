@@ -6,7 +6,7 @@ require (
 	github.com/CosmWasm/wasmvm v1.0.0-beta6
 	github.com/cosmos/cosmos-sdk v0.46.0-alpha2.0.20220308163254-68f6c8b74e1a
 	github.com/cosmos/iavl v0.17.3
-	github.com/cosmos/ibc-go/v2 v2.0.3
+	github.com/cosmos/ibc-go/v3 v3.0.0
 	github.com/dvsekhvalnov/jose2go v0.0.0-20200901110807-248326c1351b
 	github.com/gogo/protobuf v1.3.3
 	github.com/golang/protobuf v1.5.2
@@ -130,4 +130,6 @@ replace (
 	// the following version across all dependencies.
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
+
+	github.com/cosmos/ibc-go/v3 => github.com/notional-labs/ibc-go/v3 v3.0.0-20220307194004-1db588989b6a
 )
