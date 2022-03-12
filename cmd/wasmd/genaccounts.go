@@ -54,7 +54,8 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 				}
 				if keyringBackend != "" && clientCtx.Keyring == nil {
 					var err error
-					kr, err = keyring.New(sdk.KeyringServiceName(), keyringBackend, clientCtx.HomeDir, inBuf)
+					// todo(lido): make sure that clientCtx.Codec is the right codec to use.
+					kr, err = keyring.New(sdk.KeyringServiceName(), keyringBackend, clientCtx.HomeDir, inBuf, clientCtx.Codec)
 					if err != nil {
 						return err
 					}
@@ -64,9 +65,12 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 
 				info, err := kr.Key(args[0])
 				if err != nil {
-					return fmt.Errorf("failed to get address from Keyring: %w", err)
+					return fmt.Errorf("failed to get address record from Keyring: %w", err)
 				}
-				addr = info.GetAddress()
+				addr, err = info.GetAddress()
+				if err != nil {
+					return fmt.Errorf("failed to get address from address record: %w", err)
+				}
 			}
 
 			coins, err := sdk.ParseCoinsNormalized(args[1])

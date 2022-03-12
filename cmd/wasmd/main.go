@@ -12,7 +12,9 @@ import (
 func main() {
 	rootCmd, _ := NewRootCmd()
 
-	if err := svrcmd.Execute(rootCmd, app.DefaultNodeHome); err != nil {
+	// todo(lido): it doesn't seem like we need a prefix for environment variables
+	// todo(lido): here, right?
+	if err := svrcmd.Execute(rootCmd, "", app.DefaultNodeHome); err != nil {
 		switch e := err.(type) {
 		case server.ErrorCode:
 			os.Exit(e.Code)
