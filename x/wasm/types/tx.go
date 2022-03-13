@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/cosmos/cosmos-sdk/codec/legacy"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
@@ -67,7 +68,7 @@ func (msg MsgStoreCode) ValidateBasic() error {
 }
 
 func (msg MsgStoreCode) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
+	return sdk.MustSortJSON(legacy.Cdc.MustMarshalJSON(&msg))
 
 }
 
@@ -117,7 +118,7 @@ func (msg MsgInstantiateContract) ValidateBasic() error {
 }
 
 func (msg MsgInstantiateContract) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
+	return sdk.MustSortJSON(legacy.Cdc.MustMarshalJSON(&msg))
 
 }
 
@@ -155,7 +156,7 @@ func (msg MsgExecuteContract) ValidateBasic() error {
 }
 
 func (msg MsgExecuteContract) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
+	return sdk.MustSortJSON(legacy.Cdc.MustMarshalJSON(&msg))
 
 }
 
@@ -195,7 +196,7 @@ func (msg MsgMigrateContract) ValidateBasic() error {
 }
 
 func (msg MsgMigrateContract) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
+	return sdk.MustSortJSON(legacy.Cdc.MustMarshalJSON(&msg))
 
 }
 
@@ -233,7 +234,7 @@ func (msg MsgUpdateAdmin) ValidateBasic() error {
 }
 
 func (msg MsgUpdateAdmin) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
+	return sdk.MustSortJSON(legacy.Cdc.MustMarshalJSON(&msg))
 
 }
 
@@ -265,7 +266,7 @@ func (msg MsgClearAdmin) ValidateBasic() error {
 }
 
 func (msg MsgClearAdmin) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
+	return sdk.MustSortJSON(legacy.Cdc.MustMarshalJSON(&msg))
 
 }
 
@@ -291,7 +292,7 @@ func (msg MsgIBCSend) ValidateBasic() error {
 }
 
 func (msg MsgIBCSend) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
+	return sdk.MustSortJSON(legacy.Cdc.MustMarshalJSON(&msg))
 }
 
 func (msg MsgIBCSend) GetSigners() []sdk.AccAddress {
@@ -311,7 +312,7 @@ func (msg MsgIBCCloseChannel) ValidateBasic() error {
 }
 
 func (msg MsgIBCCloseChannel) GetSignBytes() []byte {
-	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(&msg))
+	return sdk.MustSortJSON(legacy.Cdc.MustMarshalJSON(&msg))
 }
 
 func (msg MsgIBCCloseChannel) GetSigners() []sdk.AccAddress {

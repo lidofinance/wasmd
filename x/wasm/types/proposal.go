@@ -69,15 +69,10 @@ func init() { // register new content types with the sdk
 	oldgovtypes.RegisterProposalType(string(ProposalTypeClearAdmin))
 	oldgovtypes.RegisterProposalType(string(ProposalTypePinCodes))
 	oldgovtypes.RegisterProposalType(string(ProposalTypeUnpinCodes))
-	ModuleCdc.LegacyAmino.RegisterConcrete(&StoreCodeProposal{}, "wasm/StoreCodeProposal", nil)
-	ModuleCdc.LegacyAmino.RegisterConcrete(&InstantiateContractProposal{}, "wasm/InstantiateContractProposal", nil)
-	ModuleCdc.LegacyAmino.RegisterConcrete(&MigrateContractProposal{}, "wasm/MigrateContractProposal", nil)
-	ModuleCdc.LegacyAmino.RegisterConcrete(&SudoContractProposal{}, "wasm/SudoContractProposal", nil)
-	ModuleCdc.LegacyAmino.RegisterConcrete(&ExecuteContractProposal{}, "wasm/ExecuteContractProposal", nil)
-	ModuleCdc.LegacyAmino.RegisterConcrete(&UpdateAdminProposal{}, "wasm/UpdateAdminProposal", nil)
-	ModuleCdc.LegacyAmino.RegisterConcrete(&ClearAdminProposal{}, "wasm/ClearAdminProposal", nil)
-	ModuleCdc.LegacyAmino.RegisterConcrete(&PinCodesProposal{}, "wasm/PinCodesProposal", nil)
-	ModuleCdc.LegacyAmino.RegisterConcrete(&UnpinCodesProposal{}, "wasm/UnpinCodesProposal", nil)
+
+	// todo(lido): not sure that deleting all these lines 100% correct, but have a look at
+	// todo(lido): https://github.com/cosmos/cosmos-sdk/commit/ff314907694742505a99413a1072e6a0aa95a0ff
+	// todo(lido): this has solved the "type already registered" errors.
 }
 
 // ProposalRoute returns the routing key of a parameter change proposal.
