@@ -108,12 +108,16 @@ func BenchmarkTxSending(b *testing.B) {
 				for j := 0; j < blockSize; j++ {
 					idx := i*blockSize + j
 
-					_, _, err := appInfo.App.Check(txEncoder, txs[idx])
-					if err != nil {
+					txBytes, err := txEncoder(txs[idx])
+					require.NoError(b, err)
+
+					resCheckTx := appInfo.App.CheckTx(abci.RequestCheckTx{Tx: txBytes})
+					if resCheckTx.IsErr() {
 						panic("something is broken in checking transaction")
 					}
-					_, _, err = appInfo.App.Deliver(txEncoder, txs[idx])
-					require.NoError(b, err)
+
+					res := appInfo.App.DeliverTx(abci.RequestDeliverTx{Tx: txBytes})
+					require.True(b, res.IsOK())
 				}
 
 				appInfo.App.EndBlock(abci.RequestEndBlock{Height: height})

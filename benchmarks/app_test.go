@@ -127,8 +127,12 @@ func InitializeWasmApp(b testing.TB, db dbm.DB, numAccounts int) AppInfo {
 	}
 	storeTx, err := helpers.GenTx(txGen, []sdk.Msg{&storeMsg}, nil, 55123123, "", []uint64{0}, []uint64{0}, minter)
 	require.NoError(b, err)
-	_, res, err := wasmApp.Deliver(txGen.TxEncoder(), storeTx)
+
+	txBytes, err := txGen.TxEncoder()(storeTx)
 	require.NoError(b, err)
+
+	res := wasmApp.DeliverTx(abci.RequestDeliverTx{Tx: txBytes})
+	require.True(b, res.IsOK())
 	codeID := uint64(1)
 
 	// instantiate the contract
@@ -161,13 +165,16 @@ func InitializeWasmApp(b testing.TB, db dbm.DB, numAccounts int) AppInfo {
 	gasWanted := 500000 + 10000*uint64(numAccounts)
 	initTx, err := helpers.GenTx(txGen, []sdk.Msg{&initMsg}, nil, gasWanted, "", []uint64{0}, []uint64{1}, minter)
 	require.NoError(b, err)
-	_, res, err = wasmApp.Deliver(txGen.TxEncoder(), initTx)
+
+	txBytes, err = txGen.TxEncoder()(initTx)
 	require.NoError(b, err)
+
+	res = wasmApp.DeliverTx(abci.RequestDeliverTx{Tx: txBytes})
 
 	// TODO: parse contract address better
 	evt := res.Events[len(res.Events)-1]
 	attr := evt.Attributes[0]
-	contractAddr := string(attr.Value)
+	contractAddr := attr.Value
 
 	wasmApp.EndBlock(abci.RequestEndBlock{Height: height})
 	wasmApp.Commit()
