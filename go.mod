@@ -147,7 +147,9 @@ require (
 replace (
 	// Use the cosmos-flavored keyring library
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.1.7-0.20210622111912-ef00f8ac3d76
-	github.com/cosmos/ibc-go/v3 => github.com/notional-labs/ibc-go/v3 v3.0.0-20220313013342-c5d92b4023b4
+
+	github.com/cosmos/cosmos-sdk => github.com/lidofinance/cosmos-sdk v0.0.0-20220328091729-a37306c5297b
+	github.com/cosmos/ibc-go/v3 => github.com/lidofinance/ibc-go/v3 v3.0.0-20220328103742-a3817a13e205
 	// Fix upstream GHSA-h395-qcrw-5vmq vulnerability.
 	// TODO Remove it: https://github.com/cosmos/cosmos-sdk/issues/10409
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.7.0
