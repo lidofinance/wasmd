@@ -2,12 +2,14 @@
 # docker run --rm -it cosmwasm/wasmd:latest /bin/sh
 FROM golang:1.17-alpine3.15 AS go-builder
 
+SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+
 # this comes from standard alpine nightly file
 #  https://github.com/rust-lang/docker-rust-nightly/blob/master/alpine3.12/Dockerfile
 # with some changes to support our toolchain, etc
-RUN set -eux; apk add --no-cache ca-certificates build-base;
+RUN set -eux; apk --no-cache add ca-certificates=20211220-r0 build-base=0.5-r2;
 
-RUN apk add git
+RUN apk --no-cache add git=2.34.2-r0
 # NOTE: add these to run with LEDGER_ENABLED=true
 # RUN apk add libusb-dev linux-headers
 
